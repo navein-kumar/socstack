@@ -106,7 +106,7 @@ For each analyzer: **Enable** → **Edit** → enter API key → **Save**
 | Field | Value |
 |-------|-------|
 | Role mapping name | `wazuh_admin` |
-| Roles | Select all admin permissions |
+| Roles | Select all admin permissions (administrator,user_admin,agents_admin,cluster_admin,) |
 | Internal users | *(leave empty)* |
 | Custom rules | backend_roles → Find → `wazuh_admin` |
 
@@ -115,7 +115,7 @@ For each analyzer: **Enable** → **Edit** → enter API key → **Save**
 | Field | Value |
 |-------|-------|
 | Role mapping name | `wazuh_read_user` |
-| Roles | Select readonly permissions |
+| Roles | Select readonly permissions (readonly,cluster_readonly,agent_readonly)  |
 | Internal users | *(leave empty)* |
 | Custom rules | backend_roles → Find → `wazuh_read_user` |
 
