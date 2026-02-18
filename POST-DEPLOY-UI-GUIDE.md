@@ -145,8 +145,8 @@ After creating both mappings, SSO users in the `wazuh_admin` Keycloak group will
 
 5. **Generate TheHive API Key for analyst account:**
    - Login to **TheHive** → `https://hive.codesec.in`
-     - User: `admin@thehive.local` / *(see `.env.deployed` → `THEHIVE_ADMIN_PASSWORD`)*
-   - Go to **Organisation** → **Users** → find `analyst@codesec.in`
+     - User: `analyst@thehive.local` / *(see `.env.deployed` → `THEHIVE_ADMIN_PASSWORD`)*
+   - Go to **Click Profile** → **Account_Settings** → of  `analyst@codesec.in`
    - Click **Create API Key** → **Reveal** → copy the API key
    - ⚠️ **Save this key** — you cannot view it again after closing the dialog
 
