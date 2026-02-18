@@ -84,7 +84,7 @@ For each analyzer: **Enable** → **Edit** → enter API key → **Save**
 
 ---
 
-## D. MISP - Initial Password Change
+## D. MISP - Initial Password Change (optional)
 
 1. Login to **MISP** → `https://cti.codesec.in`
    - Default: `admin@admin.test` / `admin`
