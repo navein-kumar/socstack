@@ -70,15 +70,15 @@ All credentials are in `/opt/socstack/.env.deployed` on the server.
 
 > **Get a VirusTotal API key:** Sign up at https://www.virustotal.com → Profile → API Key (free tier: 4 requests/min)
 
-### Other Recommended Analyzers
+### Optional Analyzers
 
 | Analyzer | Purpose | API Key Source |
 |----------|---------|----------------|
 | AbuseIPDB_1_0 | IP reputation check | https://www.abuseipdb.com |
 | OTXQuery_2_0 | AlienVault OTX threat intel | https://otx.alienvault.com |
 | Shodan_DNSResolve_2_0 | DNS/IP intelligence | https://www.shodan.io |
-| URLhaus_2_0 | Malicious URL check | Free (no key needed) |
-| FileInfo_8_0 | File analysis | Free (no key needed) |
+| URLhaus_2_0 | Malicious URL check | Get Apikey |
+| FileInfo_8_0 | File analysis | Get Apikey |
 
 For each analyzer: **Enable** → **Edit** → enter API key → **Save**
 
