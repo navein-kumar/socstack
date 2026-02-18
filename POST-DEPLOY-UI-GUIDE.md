@@ -84,13 +84,6 @@ For each analyzer: **Enable** → **Edit** → enter API key → **Save**
 
 ---
 
-## D. MISP - Initial Password Change (optional)
-
-1. Login to **MISP** → `https://cti.codesec.in`
-   - Default: `admin@admin.test` / `admin`
-2. You will be forced to change password on first login
-3. Change to your MISP admin password from `.env.deployed`
-
 ---
 
 ## E. Wazuh Dashboard - SSO Role Mapping
