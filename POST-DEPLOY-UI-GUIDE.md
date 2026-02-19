@@ -25,68 +25,66 @@ All credentials are in `/opt/socstack/.env.deployed` on the server.
 
 ---
 
-## B. TheHive - MISP Server Integration
-
-1. In **TheHive** → **Platform Management** → **MISP Servers** → **Add Server**
-2. Fill in:
-
-| Field | Value |
-|-------|-------|
-| Name | `MISP-CODESEC` |
-| URL | `https://socstack-misp-core:443` |
-| API Key | *(see `.env.deployed` → `MISP_API_KEY`)* |
-| Skip SSL verification | **Yes** |
-| Purpose | Import and Export |
-| Organisation | your org name |
-
-3. Click **Save** → **Sync Now**
-
----
-
-## C. Cortex - Enable & Configure Analyzers
+## B. Cortex - Enable & Configure Analyzers
 
 1. Login to **Cortex** → `https://cortex.codesec.in`
    - User: *(see `.env.deployed` → `CORTEX_ORG_ADMIN` / `CORTEX_ADMIN_PASSWORD`)*
 2. Go to **Organization** → **Analyzers** → **Refresh** (click the refresh icon)
 3. Wait for the analyzer list to load
 
-### Install & Configure VirusTotal Analyzer
+### Configure MISP Analyzer (Primary)
 
-1. In the Analyzers list, search for **VirusTotal**
-2. Click **Enable** on `VirusTotal_GetReport_3_1`
+1. In the Analyzers list, search for **MISP**
+2. Click **Enable** on `MISP_2_1`
 3. After enabling, click the **Edit** (pencil) icon on the analyzer
 4. Fill in:
 
 | Field | Value |
 |-------|-------|
-| key | Your VirusTotal API key |
-| polling_interval | `60` |
-| proxies | *(leave empty unless behind proxy)* |
+| url | `https://cti.codesec.in` |
+| key | *(see `.env.deployed` → `MISP_API_KEY`)* |
+| cert_check | `false` |
 
 5. Click **Save**
-6. Repeat for other VirusTotal analyzers if needed:
-   - `VirusTotal_Scan_3_1` — Submit files/URLs for scanning
-   - `VirusTotal_Download_3_1` — Download samples
 
-> **Get a VirusTotal API key:** Sign up at https://www.virustotal.com → Profile → API Key (free tier: 4 requests/min)
+> This uses your local MISP instance for threat intelligence lookups — **free, no external API key needed**. Cortex will query MISP for IOC matches (IPs, domains, hashes, URLs).
 
-### Optional Analyzers
+### All Recommended Analyzers
 
-| Analyzer | Purpose | API Key Source |
-|----------|---------|----------------|
-| AbuseIPDB_1_0 | IP reputation check | https://www.abuseipdb.com |
-| OTXQuery_2_0 | AlienVault OTX threat intel | https://otx.alienvault.com |
-| Shodan_DNSResolve_2_0 | DNS/IP intelligence | https://www.shodan.io |
-| URLhaus_2_0 | Malicious URL check | Get Apikey |
-| FileInfo_8_0 | File analysis | Get Apikey |
+| Analyzer | Purpose | API Key | Cost |
+|----------|---------|---------|------|
+| **MISP_2_1** | Threat intel IOC lookup (local MISP) | `.env.deployed` → `MISP_API_KEY` | Free |
+| URLhaus_2_0 | Malicious URL check | Not needed | Free |
+| FileInfo_8_0 | File analysis (hash, type, size) | Not needed | Free |
+| AbuseIPDB_1_0 | IP reputation check | https://www.abuseipdb.com | Free tier |
+| OTXQuery_2_0 | AlienVault OTX threat intel | https://otx.alienvault.com | Free |
+| VirusTotal_GetReport_3_1 | File/URL/IP scan reports | https://www.virustotal.com | Paid (free: 4 req/min) |
 
-For each analyzer: **Enable** → **Edit** → enter API key → **Save**
+For each analyzer: **Enable** → **Edit** → enter API key (if needed) → **Save**
 
 ---
 
+## C. MISP - Enable & Sync Threat Feeds
+
+1. Login to **MISP** → `https://cti.codesec.in`
+   - User: *(see `.env.deployed` → `MISP_ADMIN_EMAIL` / `MISP_ADMIN_PASSWORD`)*
+2. Go to **Sync Actions** → **Feeds** → **List Feeds**
+3. **Enable all feeds:**
+   - Select all feeds (checkbox at top)
+   - Click **Enable Selected**
+4. **Fetch all feeds:**
+   - Select all enabled feeds
+   - Click **Fetch and store all feeds**
+5. **Cache all feeds:**
+   - Select all enabled feeds
+   - Click **Cache all feeds**
+6. Wait for the background jobs to complete (check **Administration** → **Jobs** for progress)
+
+> **Why this matters:** MISP feeds provide the threat intelligence data that Cortex MISP analyzer uses for IOC lookups. Without enabled feeds, MISP has no data to search against.
+
 ---
 
-## E. Wazuh Dashboard - SSO Role Mapping
+## D. Wazuh Dashboard - SSO Role Mapping
 
 > **Required** for SSO users to access Wazuh features with correct permissions.
 
@@ -108,7 +106,7 @@ For each analyzer: **Enable** → **Edit** → enter API key → **Save**
 | Field | Value |
 |-------|-------|
 | Role mapping name | `wazuh_read_user` |
-| Roles | Select readonly permissions (readonly,cluster_readonly,agent_readonly)  |
+| Roles | Select readonly permissions (readonly,cluster_readonly,agent_readonly)|
 | Internal users | *(leave empty)* |
 | Custom rules | backend_roles → Find → `wazuh_read_user` |
 
@@ -116,7 +114,7 @@ After creating both mappings, SSO users in the `wazuh_admin` Keycloak group will
 
 ---
 
-## F. n8n - Import Wazuh Alert Workflow (Email + TheHive)
+## E. n8n - Import Wazuh Alert Workflow (Email + TheHive)
 
 1. Login to **n8n** → `https://n8n.codesec.in`
    - User: *(see `.env.deployed` → `N8N_ADMIN_EMAIL` / `N8N_ADMIN_PASSWORD`)*
@@ -145,8 +143,8 @@ After creating both mappings, SSO users in the `wazuh_admin` Keycloak group will
 
 5. **Generate TheHive API Key for analyst account:**
    - Login to **TheHive** → `https://hive.codesec.in`
-     - User: `analyst@thehive.local` / *(see `.env.deployed` → `THEHIVE_ADMIN_PASSWORD`)*
-   - Go to **Click Profile** → **Account_Settings** → of  `analyst@codesec.in`
+     - User: `admin@thehive.local` / *(see `.env.deployed` → `THEHIVE_ADMIN_PASSWORD`)*
+   - Go to **Organisation** → **Users** → find `analyst@codesec.in`
    - Click **Create API Key** → **Reveal** → copy the API key
    - ⚠️ **Save this key** — you cannot view it again after closing the dialog
 
@@ -211,7 +209,7 @@ After creating both mappings, SSO users in the `wazuh_admin` Keycloak group will
 
 ---
 
-## G. Grafana - Datasource & Dashboards
+## F. Grafana - Datasource & Dashboards
 
 The **Wazuh-OpenSearch** datasource is auto-provisioned via `configs/grafana/provisioning/datasources/datasources.yml`.
 
@@ -284,7 +282,8 @@ If you see "Plugin not found" or connection errors, add the datasource manually:
 | Key | Used In |
 |-----|---------|
 | `CORTEX_API_KEY` | TheHive → Cortex server config |
-| `MISP_API_KEY` | TheHive → MISP server config |
+| `MISP_API_KEY` | Cortex MISP analyzer, TheHive → MISP (optional) |
+| `MISP_ADMIN_EMAIL` / `MISP_ADMIN_PASSWORD` | MISP login, feeds setup |
 | `THEHIVE_ADMIN_PASSWORD` | TheHive admin login |
 | `THEHIVE_ANALYST_USER` | TheHive analyst account (n8n API key) |
 | `THEHIVE_ANALYST_PASSWORD` | TheHive analyst login |
