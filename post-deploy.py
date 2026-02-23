@@ -850,61 +850,48 @@ def step_wazuh_security():
                      timeout=60):
         log("  ⚠ Indexer not responding, trying anyway...")
 
-    # Copy system CA bundle into indexer for OpenID SSL verification
-    # The OpenSearch security plugin can only read files under its own config dir
-    log("  Copying system CA bundle into indexer for OIDC SSL trust...")
+    # ── Step 7a: Copy system CA into indexer (needed for OIDC SSL trust) ──────
+    # system-ca.pem is bind-mounted from host (pre-deploy.sh creates it)
+    # But we also copy it here as safety in case bind-mount wasn't present at start
+    log("  Verifying system-ca.pem in indexer for OIDC SSL trust...")
     try:
-        subprocess.run(
-            ["docker", "exec", "-u", "root", "socstack-wazuh-indexer",
-             "cp", "/etc/ssl/certs/ca-certificates.crt",
-             "/usr/share/wazuh-indexer/certs/system-ca.pem"],
+        # Check if bind-mount is working (file should exist from pre-deploy)
+        check = subprocess.run(
+            ["docker", "exec", "socstack-wazuh-indexer",
+             "test", "-f", "/usr/share/wazuh-indexer/config/certs/system-ca.pem"],
             capture_output=True, text=True, timeout=10
         )
-        subprocess.run(
-            ["docker", "exec", "-u", "root", "socstack-wazuh-indexer",
-             "chmod", "644", "/usr/share/wazuh-indexer/certs/system-ca.pem"],
-            capture_output=True, text=True, timeout=10
-        )
-        log("  ✓ System CA bundle copied to indexer certs")
+        if check.returncode == 0:
+            log("  ✓ system-ca.pem exists (bind-mounted from host)")
+        else:
+            # Fallback: copy from container's own system CA
+            subprocess.run(
+                ["docker", "exec", "-u", "root", "socstack-wazuh-indexer",
+                 "cp", "/etc/ssl/certs/ca-certificates.crt",
+                 "/usr/share/wazuh-indexer/config/certs/system-ca.pem"],
+                capture_output=True, text=True, timeout=10
+            )
+            subprocess.run(
+                ["docker", "exec", "-u", "root", "socstack-wazuh-indexer",
+                 "chmod", "644", "/usr/share/wazuh-indexer/config/certs/system-ca.pem"],
+                capture_output=True, text=True, timeout=10
+            )
+            log("  ✓ system-ca.pem copied from container (fallback)")
     except Exception as e:
-        log(f"  ✗ CA bundle copy failed: {e}")
+        log(f"  ✗ system-ca.pem check failed: {e}")
 
-    # Safety check: verify client_secret is not still the placeholder before restarting dashboard
-    dash_yml = os.path.join(BASE_DIR, "configs/wazuh/wazuh_dashboard/opensearch_dashboards.yml")
-    if os.path.exists(dash_yml):
-        with open(dash_yml) as f:
-            dash_content = f.read()
-        if "WILL_BE_SET_BY_POST_DEPLOY" in dash_content:
-            log("  ⚠ Dashboard config still has placeholder client_secret!")
-            # Try to get the secret from deployed creds
-            secret = deployed.get("KC_WAZUH_CLIENT_SECRET", "")
-            if secret:
-                dash_content = dash_content.replace("WILL_BE_SET_BY_POST_DEPLOY", secret)
-                with open(dash_yml, "w") as f:
-                    f.write(dash_content)
-                log(f"  ✓ Client secret injected (safety check)")
-            else:
-                log("  ✗ No client secret available — SSO will fail!")
-
-    # Restart wazuh dashboard to pick up new opensearch_dashboards.yml
-    log("  Restarting wazuh-dashboard to load SSO config...")
-    try:
-        subprocess.run(["docker", "restart", "socstack-wazuh-dashboard"],
-                      capture_output=True, text=True, timeout=30)
-        log("  ✓ Wazuh dashboard restarting")
-    except Exception as e:
-        log(f"  ✗ Dashboard restart failed: {e}")
-
-    # Run securityadmin.sh to apply config.yml, roles.yml, roles_mapping.yml
-    log("  Running securityadmin to apply security configs...")
+    # ── Step 7b: Run securityadmin FIRST (before any restart) ───────────────
+    # This pushes config.yml (with correct CA path) into the live security index
+    # Must run BEFORE dashboard restart so SSO config is live when dashboard starts
+    log("  Running securityadmin to apply security configs (config, roles, mappings)...")
     sa_cmd = (
         "JAVA_HOME=/usr/share/wazuh-indexer/jdk "
         "/usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh "
-        "-cd /usr/share/wazuh-indexer/opensearch-security/ "
+        "-cd /usr/share/wazuh-indexer/config/opensearch-security/ "
         "-nhnv "
-        "-cacert /usr/share/wazuh-indexer/certs/root-ca.pem "
-        "-cert /usr/share/wazuh-indexer/certs/admin.pem "
-        "-key /usr/share/wazuh-indexer/certs/admin-key.pem "
+        "-cacert /usr/share/wazuh-indexer/config/certs/root-ca.pem "
+        "-cert /usr/share/wazuh-indexer/config/certs/admin.pem "
+        "-key /usr/share/wazuh-indexer/config/certs/admin-key.pem "
         "-icl -p 9200"
     )
 
@@ -915,7 +902,6 @@ def step_wazuh_security():
         )
         if result.returncode == 0:
             log(f"  ✓ securityadmin completed successfully")
-            # Show relevant output lines
             for line in result.stdout.split("\n"):
                 if "Done" in line or "success" in line.lower() or "nodes" in line.lower():
                     log(f"    {line.strip()}")
@@ -932,8 +918,24 @@ def step_wazuh_security():
     except Exception as e:
         log(f"  ✗ securityadmin error: {e}")
 
-    # Restart indexer to reload OpenID auth domain with the new config
-    log("  Restarting wazuh-indexer to reload OpenID auth domain...")
+    # ── Step 7c: Safety check client_secret in dashboard config ─────────────
+    dash_yml = os.path.join(BASE_DIR, "configs/wazuh/wazuh_dashboard/opensearch_dashboards.yml")
+    if os.path.exists(dash_yml):
+        with open(dash_yml) as f:
+            dash_content = f.read()
+        if "WILL_BE_SET_BY_POST_DEPLOY" in dash_content:
+            log("  ⚠ Dashboard config still has placeholder client_secret!")
+            secret = deployed.get("KC_WAZUH_CLIENT_SECRET", "")
+            if secret:
+                dash_content = dash_content.replace("WILL_BE_SET_BY_POST_DEPLOY", secret)
+                with open(dash_yml, "w") as f:
+                    f.write(dash_content)
+                log(f"  ✓ Client secret injected (safety check)")
+            else:
+                log("  ✗ No client secret available — SSO will fail!")
+
+    # ── Step 7d: Restart indexer to reload security plugin with new config ───
+    log("  Restarting wazuh-indexer to reload security plugin...")
     try:
         subprocess.run(["docker", "restart", "socstack-wazuh-indexer"],
                       capture_output=True, text=True, timeout=30)
@@ -941,19 +943,25 @@ def step_wazuh_security():
     except Exception as e:
         log(f"  ✗ Indexer restart failed: {e}")
 
-    # Wait for indexer and dashboard to come back
-    log("  Waiting for services to come back...")
-    time.sleep(15)
+    # Wait for indexer to come back fully
+    log("  Waiting for indexer to come back...")
+    time.sleep(20)
     wait_for("Wazuh Indexer", "https://localhost:9200/", timeout=90)
 
-    # Restart dashboard after indexer is back
-    log("  Restarting wazuh-dashboard...")
+    # ── Step 7e: system-ca.pem is bind-mounted, so it survives restart ──────
+    # No need to re-copy — bind mount handles it automatically
+    log("  ✓ system-ca.pem persists via bind mount (no re-copy needed)")
+
+    # ── Step 7f: Restart dashboard AFTER indexer is ready ───────────────────
+    # Dashboard needs indexer+SSO both working before it starts
+    log("  Restarting wazuh-dashboard (after indexer is ready)...")
     try:
         subprocess.run(["docker", "restart", "socstack-wazuh-dashboard"],
                       capture_output=True, text=True, timeout=30)
+        log("  ✓ Wazuh dashboard restarting")
     except Exception as e:
         log(f"  ✗ Dashboard restart failed: {e}")
-    time.sleep(10)
+    time.sleep(15)
     wait_for("Wazuh Dashboard", "https://localhost:5601/", timeout=90)
 
 

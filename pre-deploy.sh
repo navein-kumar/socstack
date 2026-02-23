@@ -10,6 +10,14 @@
 #   sudo ./pre-deploy.sh
 # ============================================================
 
+# Self-fix: if this script was SCP'd from Windows, fix its own CRLF first
+# This runs before anything else so the rest of the script parses correctly
+if grep -qP '\r$' "$0" 2>/dev/null; then
+    sed -i 's/\r$//' "$0"
+    echo "Fixed CRLF in pre-deploy.sh — re-executing..."
+    exec bash "$0" "$@"
+fi
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -257,32 +265,39 @@ ok "Created config directories"
 
 # ── 6b. Fix Windows CRLF line endings ────────────────────
 # Files SCP'd from Windows have \r\n — Linux scripts/configs need \n
-info "Fixing Windows CRLF line endings on all config/script files..."
+# This covers EVERY text file in the deploy directory — configs, scripts, docs, env, compose, everything
+info "Fixing Windows CRLF line endings on ALL text files..."
 CRLF_FIXED=0
-for f in $(find "$DEPLOY_DIR/configs" -type f \( -name "*.sh" -o -name "*.py" -o -name "*.yml" -o -name "*.yaml" -o -name "*.conf" -o -name "*.xml" -o -name "*.json" \) 2>/dev/null); do
+CRLF_SCANNED=0
+
+# Single comprehensive find: ALL text file types across entire deploy dir (excluding data/ and .git/)
+while IFS= read -r f; do
+    ((CRLF_SCANNED++))
     if grep -qP '\r$' "$f" 2>/dev/null; then
         sed -i 's/\r$//' "$f"
         ((CRLF_FIXED++))
     fi
-done
-# Also fix scripts with no extension (shell wrappers like custom-n8n)
-for f in $(find "$DEPLOY_DIR/configs" -type f ! -name "*.*" 2>/dev/null); do
+done < <(find "$DEPLOY_DIR" -type f \
+    \( -name "*.sh" -o -name "*.py" -o -name "*.yml" -o -name "*.yaml" \
+    -o -name "*.conf" -o -name "*.xml" -o -name "*.json" -o -name "*.md" \
+    -o -name "*.env" -o -name "*.env.*" -o -name "*.example" \
+    -o -name "*.gitignore" -o -name "*.gitattributes" \
+    -o -name "docker-compose.yml" -o -name "docker-compose.yaml" \) \
+    ! -path "*/data/*" ! -path "*/.git/*" 2>/dev/null)
+
+# Also fix files with NO extension (shell wrappers like custom-n8n)
+while IFS= read -r f; do
+    ((CRLF_SCANNED++))
     if grep -qP '\r$' "$f" 2>/dev/null; then
         sed -i 's/\r$//' "$f"
         ((CRLF_FIXED++))
     fi
-done
-# Fix deploy scripts themselves
-for f in "$DEPLOY_DIR"/*.sh "$DEPLOY_DIR"/*.py; do
-    if [ -f "$f" ] && grep -qP '\r$' "$f" 2>/dev/null; then
-        sed -i 's/\r$//' "$f"
-        ((CRLF_FIXED++))
-    fi
-done
+done < <(find "$DEPLOY_DIR/configs" -type f ! -name "*.*" 2>/dev/null)
+
 if [ "$CRLF_FIXED" -gt 0 ]; then
-    ok "Fixed CRLF → LF in $CRLF_FIXED file(s)"
+    ok "Fixed CRLF → LF in $CRLF_FIXED of $CRLF_SCANNED file(s)"
 else
-    ok "No CRLF line endings found (all files clean)"
+    ok "All $CRLF_SCANNED text files clean (no CRLF found)"
 fi
 
 # ── 7. Fix Permissions ────────────────────────────────────
@@ -383,12 +398,13 @@ CERTYML
         ok "Created default certs.yml"
     fi
 
-    # Generate certs using Wazuh cert generator Docker image
-    info "Running wazuh-certs-generator (Docker)..."
+    # Generate certs using Wazuh cert generator Docker image (v0.0.4 for Wazuh 4.14.x)
+    info "Running wazuh-certs-generator v0.0.4 (Docker)..."
     docker run --rm \
+        -e CERT_TOOL_VERSION=4.14 \
         -v "$CERT_DIR":/certificates/ \
         -v "$CERTS_YML":/config/certs.yml \
-        wazuh/wazuh-certs-generator:0.0.2 2>&1 | tail -5
+        wazuh/wazuh-certs-generator:0.0.4 2>&1 | tail -5
 
     if [ $? -eq 0 ]; then
         # Verify generation worked
@@ -416,8 +432,20 @@ CERTYML
     else
         fail "Certificate generation failed"
         info "Manual generation:"
-        info "  docker run --rm -v $CERT_DIR:/certificates/ -v $CERTS_YML:/config/certs.yml wazuh/wazuh-certs-generator:0.0.2"
+        info "  docker run --rm -e CERT_TOOL_VERSION=4.14 -v $CERT_DIR:/certificates/ -v $CERTS_YML:/config/certs.yml wazuh/wazuh-certs-generator:0.0.4"
     fi
+fi
+
+# Copy system CA bundle → system-ca.pem (bind-mounted into indexer for OIDC/SSO trust)
+# This file must exist on the HOST before docker-compose up, as it is bind-mounted
+# The indexer uses it to verify Keycloak's SSL cert during SSO token validation
+SYSTEM_CA_SRC="/etc/ssl/certs/ca-certificates.crt"
+SYSTEM_CA_DST="$CERT_DIR/system-ca.pem"
+if [ -f "$SYSTEM_CA_SRC" ]; then
+    cp "$SYSTEM_CA_SRC" "$SYSTEM_CA_DST"
+    ok "system-ca.pem created from $SYSTEM_CA_SRC (for OIDC/SSO trust)"
+elif [ ! -f "$SYSTEM_CA_DST" ]; then
+    warn "system-ca.pem not found — SSO login may fail (no /etc/ssl/certs/ca-certificates.crt)"
 fi
 
 # Fix cert permissions — generator creates as 400 with random UID

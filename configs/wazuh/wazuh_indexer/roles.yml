@@ -363,41 +363,23 @@ manage_wazuh_index:
 
 # ── SSO Roles (Keycloak groups mapped here) ─────────────────
 
-# Role for Keycloak 'wazuh_admin' group → full access
-wazuh_admin:
-  reserved: false
-  cluster_permissions:
-    - "cluster_all"
-  index_permissions:
-    - index_patterns:
-        - "*"
-      allowed_actions:
-        - "unlimited"
-  tenant_permissions:
-    - tenant_patterns:
-        - "*"
-      allowed_actions:
-        - "kibana_all_write"
 
-# Role for Keycloak 'wazuh_user' group → read-only
-wazuh_user:
-  reserved: false
+wazuh_user: # Name: Assign a name to the role (I've used 'wazuh_readonly_doc_role' as an example)
   cluster_permissions:
+    # Cluster permissions: cluster_composite_ops_ro
     - "cluster_composite_ops_ro"
+
   index_permissions:
+    # Index: *
+    # Index permissions: read
     - index_patterns:
-        - "wazuh-*"
-      allowed_actions:
-        - "read"
-    - index_patterns:
-        - ".kibana*"
-      allowed_actions:
-        - "read"
-        - "manage"
-        - "index"
-        - "delete"
-  tenant_permissions:
-    - tenant_patterns:
         - "*"
       allowed_actions:
-        - "kibana_all_read"
+        - "read"
+
+  tenant_permissions:
+    # Tenant permissions: * for all tenants, and Read only option.
+    - tenant_patterns:
+        - "*" # <--- CHANGE: This grants read-only access to ALL tenants
+      allowed_actions:
+        - "kibana_all_read" # This corresponds

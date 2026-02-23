@@ -26,7 +26,7 @@ config:
             openid_connect_idp:
               enable_ssl: true
               verify_hostnames: false
-              pemtrustedcas_filepath: "/usr/share/wazuh-indexer/certs/system-ca.pem"
+              pemtrustedcas_filepath: "/usr/share/wazuh-indexer/config/certs/system-ca.pem"
         authentication_backend:
           type: "noop"
       basic_internal_auth_domain:
