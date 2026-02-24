@@ -83,9 +83,9 @@ A production-ready, fully automated Docker-based SOC (Security Operations Center
 | 1 | `socstack-nginx` | jc21/nginx-proxy-manager | 80, 443, 60081 | Reverse proxy + Let's Encrypt SSL |
 | 2 | `socstack-keycloak` | quay.io/keycloak/keycloak | 8081 | SSO (OpenID Connect) |
 | 3 | `socstack-keycloak-db` | postgres:15-alpine | — | Keycloak database |
-| 4 | `socstack-wazuh-manager` | wazuh/wazuh-manager:4.12.0 | 1514, 1515, 514/udp, 55000 | SIEM manager + agent listener |
-| 5 | `socstack-wazuh-indexer` | wazuh/wazuh-indexer:4.12.0 | 9200 | OpenSearch indexer |
-| 6 | `socstack-wazuh-dashboard` | wazuh/wazuh-dashboard:4.12.0 | 5601 | Wazuh Dashboard UI (SSO enabled) |
+| 4 | `socstack-wazuh-manager` | wazuh/wazuh-manager:${WAZUH_VERSION} | 1514, 1515, 514/udp, 55000 | SIEM manager + agent listener |
+| 5 | `socstack-wazuh-indexer` | wazuh/wazuh-indexer:${WAZUH_VERSION} | 9200 | OpenSearch indexer |
+| 6 | `socstack-wazuh-dashboard` | wazuh/wazuh-dashboard:${WAZUH_VERSION} | 5601 | Wazuh Dashboard UI (SSO enabled) |
 | 7 | `socstack-thehive` | strangebee/thehive:5.2 | 9000 | Case management |
 | 8 | `socstack-cortex` | thehiveproject/cortex:3.1.8-1 | 9001 | Observable analysis engine |
 | 9 | `socstack-cassandra` | cassandra:4.1 | — | TheHive primary database |
@@ -149,6 +149,8 @@ nano .env     # Fill in ALL required fields
 - All `*_PASSWORD` fields — change every `ChangeMe_*` to strong passwords
 - All `*_EMAIL` fields — your actual email addresses
 - `MISP_ORG` / `THEHIVE_ORG_NAME` / `CORTEX_ORG_NAME` — your organization name
+
+> **Credential strategy:** User-facing and frequently-changed passwords are in `.env`. Internal backend passwords (Keycloak DB, MinIO, MISP DB, MISP Redis) are hardcoded in `docker-compose.yml` since they never change after deployment.
 
 ### Step 2: Copy Files to Server
 
@@ -264,7 +266,7 @@ After `post-deploy.py` completes, some UI configurations must be done manually.
 | **C** | MISP → Enable, fetch & cache all threat feeds | 3 min |
 | **D** | Wazuh Dashboard → SSO role mapping (admin + read-only) | 3 min |
 | **E** | n8n → Import workflow, configure Redis/SMTP/TheHive, connect Wazuh webhook | 10 min |
-| **F** | Grafana → Verify auto-provisioned datasource, create dashboards | 5 min |
+| **F** | Grafana → Verify datasources, import dashboards from grafana.com | 5 min |
 
 All credentials needed are in `/opt/socstack/.env.deployed` on the server.
 
@@ -290,7 +292,7 @@ After running `post-deploy.py`, all credentials are saved to `/opt/socstack/.env
 | **Cortex** (superadmin) | `https://<CORTEX_DOMAIN>` | `<CORTEX_ADMIN_USER>` | `CORTEX_ADMIN_PASSWORD` |
 | **Cortex** (org admin) | `https://<CORTEX_DOMAIN>` | `<CORTEX_ORG_ADMIN>` | `CORTEX_ADMIN_PASSWORD` |
 | **Grafana** | `https://<GRAFANA_DOMAIN>` | `admin` | `GF_ADMIN_PASSWORD` |
-| **MinIO** | `http://<SERVER_IP>:9003` | `socminioadmin` | `MINIO_ROOT_PASSWORD` |
+| **MinIO** | `http://<SERVER_IP>:9003` | `socminioadmin` | `SocMinio@2025` (hardcoded) |
 
 ### Auto-Generated API Keys
 
@@ -391,11 +393,11 @@ Wazuh Manager ──[custom-n8n integration]──► n8n Webhook
 
 ---
 
-## Grafana Auto-Provisioned Datasource
+## Grafana Datasources & Dashboards
+
+### Auto-Provisioned Datasource
 
 The Wazuh-OpenSearch datasource is auto-provisioned via YAML — no manual setup needed.
-
-### Configuration
 
 File: `configs/grafana/provisioning/datasources/datasources.yml`
 
@@ -409,19 +411,50 @@ File: `configs/grafana/provisioning/datasources/datasources.yml`
 | **Time field** | `timestamp` |
 | **TLS** | Skip verification (self-signed internal certs) |
 
+### Elasticsearch Datasource (for Dashboards)
+
+An additional **Elasticsearch** datasource is configured for dashboard compatibility (Grafana 12 works better with the built-in elasticsearch plugin for Wazuh dashboards):
+
+| Setting | Value |
+|---------|-------|
+| **Name** | elasticsearch |
+| **Type** | elasticsearch (built-in) |
+| **URL** | `https://wazuh.indexer:9200` |
+| **Index** | `wazuh-alerts-4.x-*` |
+| **Time field** | `@timestamp` |
+
+### Importing Dashboards
+
+Grafana dashboards can be imported from [grafana.com](https://grafana.com/grafana/dashboards/) using the **elasticsearch** datasource. Recommended Wazuh dashboards:
+
+| Grafana ID | Dashboard | Notes |
+|------------|-----------|-------|
+| 22448 | WAZUH SUMMARY | Overview of all alerts |
+| 22449 | WAZUH - MITRE ATT&CK | MITRE framework mapping |
+| 22450 | WAZUH - System Security Audit | System audit events |
+| 22451 | WAZUH - System Vulnerabilities | CVE/vulnerability tracking |
+| 22453 | WAZUH - Compliance | PCI-DSS, GDPR, HIPAA compliance |
+| 23072 | WAZUH - FIM | File Integrity Monitoring |
+| 24888 | WAZUH - System Vulnerabilities v2 | Enhanced vulnerability view |
+
+**Import steps:** Grafana UI → Dashboards → Import → Enter ID → Select **elasticsearch** datasource → Import.
+
+> **Note:** Some dashboards from grafana.com use underscore field names (`agent_name`) instead of Wazuh's native dot notation (`agent.name`). If panels show "No data", edit the panel queries to use dot notation (e.g., `rule.level` instead of `rule_level`).
+
 ### Hostname Note
 
-The datasource uses `wazuh.indexer` (Docker hostname), not `socstack-wazuh-indexer` (container name). Both resolve in Docker, but `wazuh.indexer` matches the SSL certificate CN and is what the Wazuh manager uses.
+The datasource uses `wazuh.indexer` (Docker hostname), not `socstack-wazuh-indexer` (container name). Both resolve in Docker, but `wazuh.indexer` matches the SSL certificate CN.
 
 ### OpenSearch Plugin
 
 The `grafana-opensearch-datasource` plugin is downloaded by `pre-deploy.sh` from GitHub releases (because Docker internal DNS can't resolve grafana.com for `GF_INSTALL_PLUGINS`). If missing, see the manual install steps in `POST-DEPLOY-UI-GUIDE.md` section G.
 
-### Useful Index Patterns for Dashboards
+### Useful Index Patterns
 
 | Index Pattern | Content |
 |---------------|---------|
-| `wazuh-alerts-*` | Security alerts |
+| `wazuh-alerts-4.x-*` | Security alerts (use this for dashboards) |
+| `wazuh-alerts-*` | Security alerts (broader match) |
 | `wazuh-monitoring-*` | Agent monitoring |
 | `wazuh-statistics-*` | Manager statistics |
 
