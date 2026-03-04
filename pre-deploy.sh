@@ -1,4 +1,5 @@
 #!/bin/bash
+if head -1 "$0"|grep -q $'\r'; then sed -i 's/\r$//' "$0"; exec bash "$0" "$@"; fi #
 # ============================================================
 # SOC STACK - Pre-Deployment Checks & Setup
 # ============================================================
@@ -9,14 +10,6 @@
 #   chmod +x pre-deploy.sh
 #   sudo ./pre-deploy.sh
 # ============================================================
-
-# Self-fix: if this script was SCP'd from Windows, fix its own CRLF first
-# This runs before anything else so the rest of the script parses correctly
-if grep -qP '\r$' "$0" 2>/dev/null; then
-    sed -i 's/\r$//' "$0"
-    echo "Fixed CRLF in pre-deploy.sh — re-executing..."
-    exec bash "$0" "$@"
-fi
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
