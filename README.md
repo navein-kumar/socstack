@@ -1,6 +1,6 @@
 # SOC Stack — Unified Security Operations Center
 
-A production-ready, fully automated Docker-based SOC (Security Operations Center) stack deploying **19 containers** on a single server with **Keycloak SSO**, **automated SSL**, and **end-to-end integration** between all services.
+A production-ready, fully automated Docker-based SOC (Security Operations Center) stack deploying **17 containers** on a single server with **Keycloak SSO**, **automated SSL**, and **end-to-end integration** between all services.
 
 ```
   Wazuh Alert → custom-n8n webhook → n8n workflow → Email + TheHive Alert
@@ -14,7 +14,7 @@ A production-ready, fully automated Docker-based SOC (Security Operations Center
 ## Table of Contents
 
 - [Architecture](#architecture)
-- [Services (19 Containers)](#services-19-containers)
+- [Services (17 Containers)](#services-17-containers)
 - [Server Requirements](#server-requirements)
 - [Quick Start (6 Steps)](#quick-start-6-steps)
 - [Pre-Deployment (Automated)](#step-3-pre-deployment-checks)
@@ -23,7 +23,6 @@ A production-ready, fully automated Docker-based SOC (Security Operations Center
 - [Credentials & API Keys](#credentials--api-keys)
 - [Wazuh SSO (Keycloak OpenID Connect)](#wazuh-sso-keycloak-openid-connect)
 - [n8n Wazuh Integration (Email + TheHive)](#n8n-wazuh-integration-email--thehive)
-- [Grafana Auto-Provisioned Datasource](#grafana-auto-provisioned-datasource)
 - [Directory Structure](#directory-structure)
 - [Management Commands](#management-commands)
 - [Troubleshooting](#troubleshooting)
@@ -40,26 +39,23 @@ A production-ready, fully automated Docker-based SOC (Security Operations Center
                            │
                    ┌───────┴────────┐
                    │  Nginx Proxy   │  ← SSL termination (Let's Encrypt)
-                   │    Manager     │  ← Reverse proxy for all 8 services
+                   │    Manager     │  ← Reverse proxy for all 7 services
                    └───────┬────────┘
-       ┌──────┬──────┬─────┼──────┬──────┬──────┬──────┐
-       ▼      ▼      ▼     ▼      ▼      ▼      ▼      ▼
-    Wazuh  Keycloak  n8n  MISP  TheHive Cortex Grafana  NPM
-    SIEM    SSO    Workflow CTI  Cases  Analysis  Viz   Admin
-      │       ▲                    │       │       │
-      │       │  OpenID Connect    │       │       │
-      └───────┘    (SSO)           └───┬───┘       │
-      │                            Cortex API      │
-      │  custom-n8n webhook            │           │
-      └──────────► n8n ───────► TheHive Alert      │
-                    │               │              │
-                    ├──► Email      │              │
-                    │           Cortex ──► MISP    │
-                    │           (on-demand IOC     │
-                    │            analyzer lookup)  │
-                    │                              │
-            Wazuh-OpenSearch ◄─────────────────────┘
-            (auto-provisioned datasource)
+       ┌──────┬──────┬─────┼──────┬──────┬──────┐
+       ▼      ▼      ▼     ▼      ▼      ▼      ▼
+    Wazuh  Keycloak  n8n  MISP  TheHive Cortex  NPM
+    SIEM    SSO    Workflow CTI  Cases  Analysis Admin
+      │       ▲                    │       │
+      │       │  OpenID Connect    │       │
+      └───────┘    (SSO)           └───┬───┘
+      │                            Cortex API
+      │  custom-n8n webhook            │
+      └──────────► n8n ───────► TheHive Alert
+                    │               │
+                    ├──► Email      │
+                    │           Cortex ──► MISP
+                    │           (on-demand IOC
+                    │            analyzer lookup)
 ```
 
 ### Integration Flow
@@ -71,12 +67,11 @@ A production-ready, fully automated Docker-based SOC (Security Operations Center
 | n8n | TheHive | TheHive API (analyst account) | Create alerts for incident response |
 | TheHive | Cortex | Cortex API key | Observable analysis (VirusTotal, etc.) |
 | Cortex | MISP | MISP API key (via Cortex MISP analyzer) | On-demand threat intelligence lookups for observables |
-| Grafana | Wazuh Indexer | OpenSearch datasource | Security visualization dashboards |
 | Wazuh Dashboard | Keycloak | OpenID Connect (OIDC) | Single Sign-On authentication |
 
 ---
 
-## Services (19 Containers)
+## Services (17 Containers)
 
 | # | Container | Image | Ports | Purpose |
 |---|-----------|-------|-------|---------|
@@ -97,8 +92,6 @@ A production-ready, fully automated Docker-based SOC (Security Operations Center
 | 15 | `socstack-misp-modules` | misp/misp-modules | — | MISP enrichment modules |
 | 16 | `socstack-n8n` | n8nio/n8n | 5678 | Workflow automation |
 | 17 | `socstack-n8n-redis` | redis:7-alpine | — | n8n job queue |
-| 18 | `socstack-grafana` | grafana/grafana-oss | 3000 | Monitoring & visualization |
-| 19 | `socstack-grafana-renderer` | grafana-image-renderer | — | Server-side image rendering |
 
 All containers run on a single `socstack_net` Docker bridge network.
 
@@ -114,7 +107,7 @@ All containers run on a single `socstack_net` Docker bridge network.
 | **Docker** | 24+ with Compose v2 | Latest stable |
 | **Ports** | 80, 443 open to internet | Firewall restricted |
 | **Kernel** | `vm.max_map_count=262144` | Auto-set by pre-deploy.sh |
-| **DNS** | 8 A records → server IP | All pointing to same server |
+| **DNS** | 7 A records → server IP | All pointing to same server |
 
 ### Required DNS A Records
 
@@ -128,7 +121,6 @@ Create these **before deployment** — all pointing to your server's public IP:
 | `cti.yourdomain.com` | MISP CTI |
 | `hive.yourdomain.com` | TheHive Cases |
 | `cortex.yourdomain.com` | Cortex Analysis |
-| `grafana.yourdomain.com` | Grafana Dashboards |
 | `npm.yourdomain.com` | Nginx Proxy Manager |
 
 ---
@@ -167,7 +159,7 @@ ssh -p YOUR_SSH_PORT root@YOUR_SERVER_IP
 
 # Run pre-deploy (self-fixes CRLF if SCP'd from Windows)
 chmod +x /opt/socstack/pre-deploy.sh
-sudo bash /opt/socstack/pre-deploy.sh
+sudo /opt/socstack/pre-deploy.sh
 ```
 
 **pre-deploy.sh automatically handles (30 checks):**
@@ -178,11 +170,10 @@ sudo bash /opt/socstack/pre-deploy.sh
 | 2. Docker | Verifies Docker + Compose installed, daemon running |
 | 3. Kernel | Sets `vm.max_map_count=262144` (persistent) |
 | 4. Ports | Checks all required ports available |
-| 5. DNS | Verifies all 8 domain A records resolve to `SERVER_IP` |
+| 5. DNS | Verifies all 7 domain A records resolve to `SERVER_IP` |
 | 6. Directories | Creates 24 data dirs + 8 config dirs under `/opt/socstack/` |
 | 6b. CRLF Fix | Converts Windows `\r\n` → Unix `\n` on ALL configs/scripts (critical for files SCP'd from Windows) |
-| 7. Permissions | Fixes ownership: Keycloak (uid 1000), Grafana (uid 472), TheHive (uid 1000), n8n (uid 1000), custom-n8n (mode 750) |
-| 7b. Grafana Plugin | Downloads `grafana-opensearch-datasource` plugin from GitHub (Docker DNS can't resolve grafana.com for install) |
+| 7. Permissions | Fixes ownership: Keycloak (uid 1000), TheHive (uid 1000), n8n (uid 1000), custom-n8n (mode 750) |
 | 8. Wazuh Certs | Auto-generates Wazuh TLS certificates using `wazuh-certs-generator:0.0.2` (if missing), sets permissions to 444 |
 
 Expected result: **30 PASS, 0 FAIL**
@@ -194,7 +185,7 @@ cd /opt/socstack
 docker compose up -d
 ```
 
-Wait **3-5 minutes** for all 19 containers to initialize:
+Wait **3-5 minutes** for all 17 containers to initialize:
 ```bash
 # Watch container startup
 docker compose ps
@@ -236,14 +227,15 @@ Then follow the [Post-Deployment UI Guide](#post-deployment-ui-configuration-man
 |------|---------|--------|---------|
 | Pre | Keycloak | Fix permissions | `chown -R 1000:0` data dir for gzip theme cache |
 | Pre | Wazuh Manager | Fix custom-n8n | `chmod`/`chown` integration scripts inside container to match `/var/ossec/integrations/slack` |
-| 1 | **NPM** | Proxy hosts + SSL | Creates 8 reverse proxy hosts, requests Let's Encrypt SSL certs (skips existing) |
+| 1 | **NPM** | Proxy hosts + SSL | Creates 7 reverse proxy hosts, requests Let's Encrypt SSL certs (skips existing) |
 | 2 | **n8n** | Owner account | Creates admin owner (disables public signup permanently) |
 | 3 | **Cortex** | Full setup | Migrates DB, creates superadmin, org, org admin, generates API key |
 | 4 | **TheHive** | Full setup | Changes default password, creates org `CODESEC`, creates analyst user |
 | 5 | **MISP** | API key | Retrieves API key from MISP database, verifies it works |
 | 6 | **Keycloak SSO** | Full SSO setup | Creates realm `wazuh`, OIDC client, groups, SSO users, injects client secret into Wazuh Dashboard config |
 | 7 | **Wazuh Security** | Apply configs | Copies system CA bundle into indexer (for Let's Encrypt verification), runs `securityadmin.sh`, verifies client_secret not placeholder, restarts indexer + dashboard |
-| 8 | **Save** | Credentials | Writes all credentials + API keys to `.env.deployed` |
+| 8 | **Wazuh API** | SSO role mapping | Creates security rules via Wazuh Manager API (port 55000) to map SSO groups to Wazuh App RBAC roles (run_as) |
+| 9 | **Save** | Credentials | Writes all credentials + API keys to `.env.deployed` |
 
 **Safety features:**
 - Idempotent — safe to re-run multiple times
@@ -264,9 +256,8 @@ After `post-deploy.py` completes, some UI configurations must be done manually.
 | **A** | TheHive → Cortex server integration | 2 min |
 | **B** | Cortex → Enable MISP analyzer (primary, free) + other analyzers | 5 min |
 | **C** | MISP → Enable, fetch & cache all threat feeds | 3 min |
-| **D** | Wazuh Dashboard → SSO role mapping (admin + read-only) | 3 min |
+| **D** | Wazuh Dashboard → SSO role mapping (**AUTOMATED** by Step 8) | 0 min |
 | **E** | n8n → Import workflow, configure Redis/SMTP/TheHive, connect Wazuh webhook | 10 min |
-| **F** | Grafana → Verify datasources, import dashboards from grafana.com | 5 min |
 
 All credentials needed are in `/opt/socstack/.env.deployed` on the server.
 
@@ -291,7 +282,6 @@ After running `post-deploy.py`, all credentials are saved to `/opt/socstack/.env
 | **TheHive** (analyst) | `https://<THEHIVE_DOMAIN>` | `<THEHIVE_ANALYST_USER>` | `THEHIVE_ANALYST_PASSWORD` |
 | **Cortex** (superadmin) | `https://<CORTEX_DOMAIN>` | `<CORTEX_ADMIN_USER>` | `CORTEX_ADMIN_PASSWORD` |
 | **Cortex** (org admin) | `https://<CORTEX_DOMAIN>` | `<CORTEX_ORG_ADMIN>` | `CORTEX_ADMIN_PASSWORD` |
-| **Grafana** | `https://<GRAFANA_DOMAIN>` | `admin` | `GF_ADMIN_PASSWORD` |
 | **MinIO** | `http://<SERVER_IP>:9003` | `socminioadmin` | `SocMinio@2025` (hardcoded) |
 
 ### Auto-Generated API Keys
@@ -317,16 +307,18 @@ SSO is **fully automated** by `post-deploy.py`. No manual SSO configuration need
          Wazuh Indexer ←── OpenID Connect (groups claim)
                                      ↓
                               Groups → Roles mapping:
-                              wazuh_admin → full admin (all_access)
-                              wazuh_user  → read-only (wazuh-* indices)
+                              soc-admin    → full admin (all_access)
+                              soc-analyst  → full access (all_access)
+                              soc-readonly → read-only (wazuh-* indices)
 ```
 
 ### SSO Users (Created by post-deploy.py)
 
 | User | Keycloak Group | Backend Role | Access Level |
 |------|---------------|-------------|-------------|
-| `<SSO_ADMIN_EMAIL>` | `wazuh_admin` | `wazuh_admin` | Full admin |
-| `<SSO_USER_EMAIL>` | `wazuh_user` | `wazuh_user` | Read-only |
+| `<SSO_ADMIN_EMAIL>` | `soc-admin` | `all_access` | Full admin |
+| `<SSO_ANALYST_EMAIL>` | `soc-analyst` | `all_access` | Full access |
+| `<SSO_USER_EMAIL>` | `soc-readonly` | `wazuh_user` + `kibana_user` | Read-only |
 
 ### SSO Login Flow
 
@@ -341,7 +333,7 @@ SSO is **fully automated** by `post-deploy.py`. No manual SSO configuration need
 2. Switch to realm **`wazuh`**
 3. **Users** → **Add user** → set username, email, name
 4. **Credentials** → set password (temporary: off)
-5. **Groups** → join `wazuh_admin` or `wazuh_user`
+5. **Groups** → join `soc-admin`, `soc-analyst`, or `soc-readonly`
 
 ### SSO Technical Details
 
@@ -350,8 +342,8 @@ The SSO chain involves 4 config files:
 | File | Purpose |
 |------|---------|
 | `configs/wazuh/wazuh_indexer/config.yml` | OpenID auth domain: validates JWT tokens from Keycloak using `subject_key: preferred_username`, `roles_key: groups`. Needs system CA bundle for Let's Encrypt verification. |
-| `configs/wazuh/wazuh_indexer/roles.yml` | Defines `wazuh_admin` (full cluster + indices) and `wazuh_user` (read-only wazuh-* indices) roles |
-| `configs/wazuh/wazuh_indexer/roles_mapping.yml` | Maps Keycloak groups → OpenSearch roles: `wazuh_admin` → `all_access` + `kibana_user`; `wazuh_user` → `wazuh_user` + `kibana_user` |
+| `configs/wazuh/wazuh_indexer/roles.yml` | Defines custom roles for cluster + indices access levels |
+| `configs/wazuh/wazuh_indexer/roles_mapping.yml` | Maps Keycloak groups → OpenSearch roles: `soc-admin` → `all_access`, `soc-analyst` → `all_access`, `soc-readonly` → `wazuh_user` + `kibana_user` |
 | `configs/wazuh/wazuh_dashboard/opensearch_dashboards.yml` | Enables OpenID auth alongside basic auth, configures OIDC endpoints, client ID/secret, logout URL |
 
 **Critical:** The indexer needs the system CA bundle at `/usr/share/wazuh-indexer/certs/system-ca.pem` to verify Keycloak's Let's Encrypt HTTPS certificate. This is automatically handled by `post-deploy.py` step 7.
@@ -393,78 +385,11 @@ Wazuh Manager ──[custom-n8n integration]──► n8n Webhook
 
 ---
 
-## Grafana Datasources & Dashboards
-
-### Auto-Provisioned Datasource
-
-The Wazuh-OpenSearch datasource is auto-provisioned via YAML — no manual setup needed.
-
-File: `configs/grafana/provisioning/datasources/datasources.yml`
-
-| Setting | Value |
-|---------|-------|
-| **Name** | Wazuh-OpenSearch |
-| **Type** | grafana-opensearch-datasource |
-| **URL** | `https://wazuh.indexer:9200` |
-| **Auth** | Basic auth (`admin` / `WAZUH_INDEXER_PASSWORD`) |
-| **Index** | `wazuh-alerts-*` |
-| **Time field** | `timestamp` |
-| **TLS** | Skip verification (self-signed internal certs) |
-
-### Elasticsearch Datasource (for Dashboards)
-
-An additional **Elasticsearch** datasource is configured for dashboard compatibility (Grafana 12 works better with the built-in elasticsearch plugin for Wazuh dashboards):
-
-| Setting | Value |
-|---------|-------|
-| **Name** | elasticsearch |
-| **Type** | elasticsearch (built-in) |
-| **URL** | `https://wazuh.indexer:9200` |
-| **Index** | `wazuh-alerts-4.x-*` |
-| **Time field** | `@timestamp` |
-
-### Importing Dashboards
-
-Grafana dashboards can be imported from [grafana.com](https://grafana.com/grafana/dashboards/) using the **elasticsearch** datasource. Recommended Wazuh dashboards:
-
-| Grafana ID | Dashboard | Notes |
-|------------|-----------|-------|
-| 22448 | WAZUH SUMMARY | Overview of all alerts |
-| 22449 | WAZUH - MITRE ATT&CK | MITRE framework mapping |
-| 22450 | WAZUH - System Security Audit | System audit events |
-| 22451 | WAZUH - System Vulnerabilities | CVE/vulnerability tracking |
-| 22453 | WAZUH - Compliance | PCI-DSS, GDPR, HIPAA compliance |
-| 23072 | WAZUH - FIM | File Integrity Monitoring |
-| 24888 | WAZUH - System Vulnerabilities v2 | Enhanced vulnerability view |
-
-**Import steps:** Grafana UI → Dashboards → Import → Enter ID → Select **elasticsearch** datasource → Import.
-
-> **Note:** Some dashboards from grafana.com use underscore field names (`agent_name`) instead of Wazuh's native dot notation (`agent.name`). If panels show "No data", edit the panel queries to use dot notation (e.g., `rule.level` instead of `rule_level`).
-
-### Hostname Note
-
-The datasource uses `wazuh.indexer` (Docker hostname), not `socstack-wazuh-indexer` (container name). Both resolve in Docker, but `wazuh.indexer` matches the SSL certificate CN.
-
-### OpenSearch Plugin
-
-The `grafana-opensearch-datasource` plugin is downloaded by `pre-deploy.sh` from GitHub releases (because Docker internal DNS can't resolve grafana.com for `GF_INSTALL_PLUGINS`). If missing, see the manual install steps in `POST-DEPLOY-UI-GUIDE.md` section G.
-
-### Useful Index Patterns
-
-| Index Pattern | Content |
-|---------------|---------|
-| `wazuh-alerts-4.x-*` | Security alerts (use this for dashboards) |
-| `wazuh-alerts-*` | Security alerts (broader match) |
-| `wazuh-monitoring-*` | Agent monitoring |
-| `wazuh-statistics-*` | Manager statistics |
-
----
-
 ## Directory Structure
 
 ```
 /opt/socstack/
-├── docker-compose.yml              # Main compose file (19 services)
+├── docker-compose.yml              # Main compose file (17 services)
 ├── .env                            # Configuration (edit before deploy)
 ├── .env.example                    # Template with all variables
 ├── .env.deployed                   # Auto-generated credentials (after post-deploy)
@@ -477,7 +402,7 @@ The `grafana-opensearch-datasource` plugin is downloaded by `pre-deploy.sh` from
 ├── ssl-setup.py                    # SSL certificate helper
 ├── cortex-setup.py                 # Cortex initialization helper
 ├── README.md                       # This file
-├── POST-DEPLOY-UI-GUIDE.md         # Shareable manual UI config guide (sections A-G)
+├── POST-DEPLOY-UI-GUIDE.md         # Shareable manual UI config guide (sections A-E)
 │
 ├── configs/
 │   ├── wazuh/
@@ -498,12 +423,8 @@ The `grafana-opensearch-datasource` plugin is downloaded by `pre-deploy.sh` from
 │   │       └── custom-n8n.py               # Python script (alert formatting)
 │   ├── thehive/
 │   │   └── cortex-application.conf         # Cortex config (elasticsearch: socstack-elasticsearch)
-│   ├── n8n/
-│   │   └── 1_Wazuh_Email_Alert.json        # n8n workflow (import into n8n UI)
-│   └── grafana/
-│       └── provisioning/
-│           └── datasources/
-│               └── datasources.yml         # Auto-provisioned Wazuh-OpenSearch datasource
+│   └── n8n/
+│       └── 1_Wazuh_Email_Alert.json        # n8n workflow (import into n8n UI)
 │
 └── data/                                   # All persistent data volumes
     ├── nginx/                              # NPM data + Let's Encrypt certs
@@ -521,9 +442,6 @@ The `grafana-opensearch-datasource` plugin is downloaded by `pre-deploy.sh` from
     │   ├── minio_data/
     │   ├── thehive_data/ thehive_files/ thehive_index/ thehive_logs/
     │   └── cortex_logs/
-    └── grafana/                            # Grafana DB + plugins
-        └── plugins/
-            └── grafana-opensearch-datasource/  # Downloaded by pre-deploy.sh
 ```
 
 ---
@@ -534,7 +452,7 @@ The `grafana-opensearch-datasource` plugin is downloaded by `pre-deploy.sh` from
 cd /opt/socstack
 
 # ── Start / Stop / Restart ──────────────────────────
-docker compose up -d                          # Start all 19 containers
+docker compose up -d                          # Start all 17 containers
 docker compose down                           # Stop all (preserves data)
 docker compose restart                        # Restart all
 docker restart socstack-<name>                # Restart single service
@@ -655,19 +573,6 @@ sed -i 's|elasticsearch:9200|socstack-elasticsearch:9200|g' \
 docker restart socstack-cortex
 ```
 
-### Grafana "Plugin not found" for OpenSearch
-
-**Cause:** `grafana-opensearch-datasource` plugin not installed (Docker DNS can't download it).
-
-```bash
-# Manual install
-curl -sL -o /tmp/opensearch-plugin.zip \
-  https://github.com/grafana/opensearch-datasource/releases/download/v2.22.1/grafana-opensearch-datasource-2.22.1.linux_amd64.zip
-unzip -qo /tmp/opensearch-plugin.zip -d /opt/socstack/data/grafana/plugins/
-chown -R 472:0 /opt/socstack/data/grafana/plugins/
-docker restart socstack-grafana
-```
-
 ### docker-compose mount error "not a directory"
 
 **Cause:** Config file missing from deploy dir → Docker creates a directory stub instead.
@@ -722,7 +627,6 @@ These issues have been identified and are handled automatically by the deploymen
 | Windows CRLF line endings break scripts | Files SCP'd from Windows have `\r\n` | `pre-deploy.sh` section 6b auto-converts all files |
 | Wazuh cert generator v0.0.4 broken | Wazuh removed download URL from packages.wazuh.com | Uses `v0.0.2` instead |
 | Cert permissions (400) block containers | Generator creates files with random UID, mode 400 | `pre-deploy.sh` sets `chmod 444` |
-| Grafana plugin download fails in Docker | Docker internal DNS (127.0.0.11) can't resolve grafana.com | `pre-deploy.sh` downloads from GitHub releases |
 | Keycloak gzip theme cache fails | Volume mount creates root-owned dir, Keycloak needs uid 1000 | `pre-deploy.sh` + `post-deploy.py` fix ownership |
 | SSO client_secret placeholder not replaced | Race condition if post-deploy step 6 fails | `post-deploy.py` step 7 has safety check + re-injection |
 | Cortex hostname mismatch | Config has `elasticsearch` instead of `socstack-elasticsearch` | Fixed in `cortex-application.conf` |
@@ -789,13 +693,13 @@ python3 /opt/socstack/post-deploy.py
 | `.env` | Your deployment configuration | Before first deploy |
 | `.gitattributes` | Forces LF line endings in Git | Never |
 | `pre-deploy.sh` | Pre-deployment checks & setup (30 checks) | Rarely |
-| `docker-compose.yml` | All 19 service definitions | When adding/modifying services |
-| `post-deploy.py` | Automated post-deploy configuration (8 steps) | When changing automation logic |
+| `docker-compose.yml` | All 17 service definitions | When adding/modifying services |
+| `post-deploy.py` | Automated post-deploy configuration (9 steps) | When changing automation logic |
 | `test-stack.py` | Full test suite (59+ tests) | When adding new tests |
 | `test-creds.py` | Credential validation tests (30+ checks) | When adding new creds |
 | `ssl-setup.py` | SSL certificate helper | Rarely |
 | `cortex-setup.py` | Cortex initialization helper | Rarely |
-| `POST-DEPLOY-UI-GUIDE.md` | Shareable manual UI config guide (A-G) | When adding UI steps |
+| `POST-DEPLOY-UI-GUIDE.md` | Shareable manual UI config guide (A-E) | When adding UI steps |
 | `configs/wazuh/certs.yml` | Wazuh cert generator hostnames | Before generating certs |
 | `configs/wazuh/wazuh_indexer/config.yml` | OpenSearch security (OpenID) | When changing SSO |
 | `configs/wazuh/wazuh_indexer/roles.yml` | Role definitions | When adding custom roles |
@@ -806,13 +710,12 @@ python3 /opt/socstack/post-deploy.py
 | `configs/wazuh/wazuh_cluster/custom-n8n.py` | Webhook integration Python script | When modifying alert payload |
 | `configs/n8n/1_Wazuh_Email_Alert.json` | n8n workflow definition | Import via n8n UI |
 | `configs/thehive/cortex-application.conf` | Cortex app config | When changing Cortex settings |
-| `configs/grafana/provisioning/datasources/datasources.yml` | Grafana Wazuh datasource | When changing datasource |
 
 ---
 
 ## Network Architecture
 
-All 19 containers communicate over a single Docker bridge network:
+All 17 containers communicate over a single Docker bridge network:
 
 ```
 socstack_net (172.x.x.0/16)
@@ -838,10 +741,7 @@ socstack_net (172.x.x.0/16)
 ├── socstack-misp-modules       → MISP enrichment modules
 │
 ├── socstack-n8n                → workflow automation (receives Wazuh webhooks)
-├── socstack-n8n-redis          → n8n job queue
-│
-├── socstack-grafana            → dashboards (auto-provisioned Wazuh datasource)
-└── socstack-grafana-renderer   → server-side image rendering
+└── socstack-n8n-redis          → n8n job queue
 ```
 
 Internal service discovery uses Docker hostnames (e.g., `wazuh.indexer:9200`, `socstack-thehive:9000`).
@@ -851,4 +751,3 @@ Internal service discovery uses Docker hostnames (e.g., `wazuh.indexer:9200`, `s
 ## License
 
 Internal use. All third-party components retain their original licenses.
-

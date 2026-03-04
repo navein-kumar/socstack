@@ -84,33 +84,21 @@ For each analyzer: **Enable** → **Edit** → enter API key (if needed) → **S
 
 ---
 
-## D. Wazuh Dashboard - SSO Role Mapping
+## D. Wazuh Dashboard - SSO Role Mapping (AUTOMATED)
 
-> **Required** for SSO users to access Wazuh features with correct permissions.
+> **This step is now AUTOMATED by `post-deploy.py` Step 8.** No manual configuration is required.
 
-1. Login to **Wazuh Dashboard** → `https://wazuh.codesec.in`
-   - Use basic auth: `admin` / *(see `.env.deployed` → `WAZUH_INDEXER_PASSWORD`)*
-2. Go to **Wazuh** → **Security** → **Roles mapping** → **Create role mapping**
+The following Wazuh role mappings are created automatically during deployment:
 
-### Role Map 1: Admin
+| Role Mapping | Roles | Custom Rule |
+|-------------|-------|-------------|
+| `soc-admin` | administrator, users_admin, agents_admin, cluster_admin | `backend_roles` → Find → `soc-admin` |
+| `soc-analyst` | administrator, users_admin, agents_admin, cluster_admin | `backend_roles` → Find → `soc-analyst` |
+| `soc-readonly` | readonly, agents_readonly, cluster_readonly | `backend_roles` → Find → `soc-readonly` |
 
-| Field | Value |
-|-------|-------|
-| Role mapping name | `wazuh_admin` |
-| Roles | Select all admin permissions (administrator,user_admin,agents_admin,cluster_admin,) |
-| Internal users | *(leave empty)* |
-| Custom rules | backend_roles → Find → `wazuh_admin` |
+SSO users are assigned permissions based on their Keycloak group membership, which maps to the corresponding backend role above.
 
-### Role Map 2: Read-Only User
-
-| Field | Value |
-|-------|-------|
-| Role mapping name | `wazuh_read_user` |
-| Roles | Select readonly permissions (readonly,cluster_readonly,agent_readonly)|
-| Internal users | *(leave empty)* |
-| Custom rules | backend_roles → Find → `wazuh_read_user` |
-
-After creating both mappings, SSO users in the `wazuh_admin` Keycloak group will get admin access, and users in `wazuh_user` group will get read-only access.
+> **Note:** If you need to verify or modify these mappings, go to **Wazuh** → **Security** → **Roles mapping** in the Dashboard UI at `https://wazuh.codesec.in`.
 
 ---
 
@@ -209,59 +197,6 @@ After creating both mappings, SSO users in the `wazuh_admin` Keycloak group will
 
 ---
 
-## F. Grafana - Datasource & Dashboards
-
-The **Wazuh-OpenSearch** datasource is auto-provisioned via `configs/grafana/provisioning/datasources/datasources.yml`.
-
-### Verify Datasource Connection
-
-1. Login to **Grafana** → `https://grafana.codesec.in`
-   - User: `admin` / *(see `.env.deployed` → `GF_ADMIN_PASSWORD`)*
-2. Go to **Connections** → **Data sources** → **Wazuh-OpenSearch**
-3. Click **Save & Test** — should show "Data source connected and target index-pattern exists"
-
-### If Auto-Provisioned Datasource Fails
-
-If you see "Plugin not found" or connection errors, add the datasource manually:
-
-1. Go to **Connections** → **Data sources** → **Add data source**
-2. Search for **OpenSearch** (requires `grafana-opensearch-datasource` plugin)
-3. Fill in:
-
-| Field | Value |
-|-------|-------|
-| Name | `Wazuh-OpenSearch` |
-| URL | `https://wazuh.indexer:9200` |
-| Auth → Basic auth | **ON** |
-| User | `admin` |
-| Password | *(see `.env.deployed` → `WAZUH_INDEXER_PASSWORD`)* |
-| TLS → Skip TLS Verify | **ON** |
-| OpenSearch details → Version | `2.19.1` |
-| OpenSearch details → Index name | `wazuh-alerts-*` |
-| OpenSearch details → Time field | `timestamp` |
-
-4. Click **Save & Test**
-
-> **Note:** If the OpenSearch plugin is missing, install it on the server:
-> ```bash
-> # Download plugin (requires internet access from server)
-> curl -sL -o /tmp/opensearch-plugin.zip \
->   https://github.com/grafana/opensearch-datasource/releases/download/v2.22.1/grafana-opensearch-datasource-2.22.1.linux_amd64.zip
-> unzip -qo /tmp/opensearch-plugin.zip -d /opt/socstack/data/grafana/plugins/
-> chown -R 472:0 /opt/socstack/data/grafana/plugins/
-> docker restart socstack-grafana
-> ```
-
-### Create Dashboards
-
-1. Go to **Dashboards** → **Import** → create custom dashboards using the Wazuh-OpenSearch datasource
-2. Useful index patterns:
-   - `wazuh-alerts-*` — Security alerts
-   - `wazuh-monitoring-*` — Agent monitoring
-   - `wazuh-statistics-*` — Manager statistics
-
----
-
 ## Quick Reference: Service URLs
 
 | Service | URL | Purpose |
@@ -272,7 +207,6 @@ If you see "Plugin not found" or connection errors, add the datasource manually:
 | MISP | https://cti.codesec.in | Threat Intelligence |
 | TheHive | https://hive.codesec.in | Case Management |
 | Cortex | https://cortex.codesec.in | Analysis Engine |
-| Grafana | https://grafana.codesec.in | Visualization |
 | NPM | https://npm.codesec.in | Proxy Manager |
 
 ---
@@ -290,4 +224,3 @@ If you see "Plugin not found" or connection errors, add the datasource manually:
 | `CORTEX_ADMIN_PASSWORD` | Cortex login |
 | `WAZUH_INDEXER_PASSWORD` | Wazuh Dashboard basic auth login |
 | `N8N_ADMIN_EMAIL` / `N8N_ADMIN_PASSWORD` | n8n login |
-| `GF_ADMIN_PASSWORD` | Grafana login |

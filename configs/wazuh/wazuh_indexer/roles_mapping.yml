@@ -11,10 +11,12 @@ all_access:
   backend_roles:
     - "admin"
     - "wazuh_admin"
+    - "soc-admin"
+    - "soc-analyst"
   hosts: []
   users: []
   and_backend_roles: []
-  description: "Maps admin and SSO wazuh_admin to all_access"
+  description: "Maps admin, wazuh_admin, soc-admin, soc-analyst to all_access"
 
 own_index:
   reserved: false
@@ -57,6 +59,9 @@ kibana_user:
   hidden: false
   backend_roles:
     - "kibanauser"
+    - "soc-admin"
+    - "soc-analyst"
+    - "soc-readonly"
   description: "Maps kibanauser and SSO groups to kibana_user"
 
 manage_wazuh_index:
@@ -75,4 +80,5 @@ wazuh_user:
   hidden: false
   backend_roles:
     - "wazuh_user"
-  description: "Maps Keycloak wazuh_user group to wazuh_user role"
+    - "soc-readonly"
+  description: "Maps wazuh_user and soc-readonly to wazuh_user role"

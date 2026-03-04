@@ -10,10 +10,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        704,
-        960
+        -624,
+        32
       ],
-      "id": "53d8015f-3ea8-4be5-a32f-4773110c869a",
+      "id": "3891776a-3f1a-48f6-b4e0-49a7b470f27f",
       "name": "Webhook",
       "webhookId": "21219720-0300-4e29-8408-ea4b3a759e96"
     },
@@ -30,10 +30,10 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        2288,
-        672
+        960,
+        -256
       ],
-      "id": "ef45370e-459a-4ca7-a4df-579dbb5086d7",
+      "id": "346ea03e-a861-43ef-baf9-a6d947fc7ff7",
       "name": "Send email",
       "webhookId": "80fbb052-8acf-4fce-bbd6-d248dc9f36c1",
       "credentials": {
@@ -52,10 +52,10 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        1328,
-        928
+        0,
+        0
       ],
-      "id": "57f76c37-7c4a-4458-8f7b-255e5adb2ec4",
+      "id": "c00c0fc7-dd82-4160-8edb-03b85c2e7aa9",
       "name": "Redis",
       "alwaysOutputData": false,
       "credentials": {
@@ -94,10 +94,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1536,
-        832
+        208,
+        -96
       ],
-      "id": "c41e64fd-5428-4673-a319-409c4e4ec4aa",
+      "id": "a178392c-56fb-4b06-ade5-e0c05b75034e",
       "name": "If1"
     },
     {
@@ -110,10 +110,10 @@
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
       "position": [
-        1776,
-        752
+        448,
+        -176
       ],
-      "id": "8c8129b3-cc4d-4569-8229-215fdb2463e5",
+      "id": "cfae945c-c944-4e9d-ac70-b8c0ac1fa5a6",
       "name": "Redis1",
       "credentials": {
         "redis": {
@@ -129,10 +129,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        928,
-        960
+        -400,
+        32
       ],
-      "id": "a5776eb7-ec26-4e1b-b2db-93b67357d6a7",
+      "id": "ee5445af-0530-4cef-802a-75971ffccda8",
       "name": "field_map"
     },
     {
@@ -153,10 +153,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1152,
-        944
+        -176,
+        16
       ],
-      "id": "5ef3c5ae-16cc-4aa8-98b5-aaf328dd5b38",
+      "id": "f6109ebd-81b4-4976-b697-aead014069b5",
       "name": "set_field"
     },
     {
@@ -166,10 +166,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2080,
-        688
+        752,
+        -240
       ],
-      "id": "0c0bc974-54e8-4853-99f0-7162dc1c2e3d",
+      "id": "a676e364-b8ca-4077-b56b-ff853624eb39",
       "name": "table"
     },
     {
@@ -181,10 +181,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1936,
-        928
+        608,
+        0
       ],
-      "id": "2c138565-7765-4deb-b14c-6ef05b32c47e",
+      "id": "4e6023c4-ae8d-433c-9a96-649361e12580",
       "name": "Edit Fields"
     },
     {
@@ -445,10 +445,10 @@
       "type": "n8n-nodes-base.theHiveProject",
       "typeVersion": 1,
       "position": [
-        2256,
-        1008
+        928,
+        80
       ],
-      "id": "fb59c6cb-fab8-4728-9855-e211b832d124",
+      "id": "4d5046de-3f40-4907-b26b-0741e3e49dc0",
       "name": "Create an alert",
       "credentials": {
         "theHiveProjectApi": {
@@ -554,17 +554,17 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "32d2533b-5f23-4b9c-aafb-c194688f4486",
+  "versionId": "e9c3b8e6-e967-4c03-a8fd-3c060c3ca88c",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "e9b6a04864197a44bbfa1c46c237bf63bfce5d647f5b02d30e41f3e11f7a1938"
   },
-  "id": "OqFHaJo2YAiKIPjp",
+  "id": "1h3Sh4IHXJNAytMh",
   "tags": []
 }
