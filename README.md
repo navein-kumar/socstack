@@ -167,7 +167,7 @@ ssh -p YOUR_SSH_PORT root@YOUR_SERVER_IP
 
 # Run pre-deploy (self-fixes CRLF if SCP'd from Windows)
 chmod +x /opt/socstack/pre-deploy.sh
-sudo /opt/socstack/pre-deploy.sh
+sudo bash /opt/socstack/pre-deploy.sh
 ```
 
 **pre-deploy.sh automatically handles (30 checks):**
@@ -851,3 +851,4 @@ Internal service discovery uses Docker hostnames (e.g., `wazuh.indexer:9200`, `s
 ## License
 
 Internal use. All third-party components retain their original licenses.
+
